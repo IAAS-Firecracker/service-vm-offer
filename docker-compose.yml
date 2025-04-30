@@ -1,0 +1,16 @@
+services:
+  service-vm-offer:
+    build: .
+    ports:
+      - 5002:5002
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - iaas-firecracker-network
+
+networks:
+  iaas-firecracker-network:
