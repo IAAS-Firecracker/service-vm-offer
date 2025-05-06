@@ -1,16 +1,17 @@
 
 import os
 from pathlib import Path
-from .config_client import get_config 
-from .eureka_client import *
+from .eureka_client import init_eureka
 import logging
 import os
 import dotenv
 import sys
 import logging
 from pathlib import Path
-from .config_client import get_config
 from .eureka_client import init_eureka
+import requests 
+
+
 
 # Configurer le logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -19,6 +20,28 @@ logger = logging.getLogger(__name__)
 # Charger les variables d'environnement
 dotenv.load_dotenv()
 
+
+def get_config(application_name,url):
+    if not application_name or not url:
+        logger.warning(f"Paramètres manquants: application_name={application_name}, url={url}")
+        return None
+        
+    try:
+        logger.info(f"Tentative de récupération de la configuration pour {application_name} depuis {url}")
+        response = requests.get(f"{url}/{application_name}/profile", timeout=5)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Erreur lors de la récupération de la configuration: {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Exception lors de la requête vers le serveur de configuration: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Erreur inattendue dans get_config: {e}")
+        return None
+    
 # Fonction pour mettre à jour les variables d'environnement
 def update_env_file(env_vars):
     try:
@@ -65,20 +88,28 @@ CONFIG_SERVER = {
 
 def load_config():
     try:
+        # Vérifier les variables d'environnement requises
+        app_name = os.getenv('APP_NAME')
+        config_uri = os.getenv('SERVICE_CONFIG_URI')
+        
+        if not app_name or not config_uri:
+            logger.warning(f"Variables d'environnement manquantes: APP_NAME={app_name}, SERVICE_CONFIG_URI={config_uri}")
+            logger.info("Utilisation des configurations par défaut")
+            return
+            
         # Récupérer la configuration depuis le serveur de configuration
-        CONF = get_config(os.getenv('APP_NAME'), CONFIG_SERVER['config']['uri'])
-        logger.info("Configuration récupérée avec succès")
+        CONF = get_config(app_name, config_uri)
         
+        if not CONF:
+            logger.warning("Impossible de récupérer la configuration, utilisation des configurations par défaut")
+            return
+            
         # Extraire les propriétés de la source
+        if 'propertySources' not in CONF or not CONF.get("propertySources"):
+            logger.warning("Format de configuration invalide, utilisation des configurations par défaut")
+            return
+            
         properties = CONF.get("propertySources")[0].get('source')
-        
-        # Configuration Eureka
-        eureka_conf = {
-            'server': properties.get('eureka.client.service-url.defaultZone'),
-            'app_name': os.getenv('APP_NAME').upper(),
-            'port': int(properties.get('server.port'))
-        }
-        logger.info(f"Configuration Eureka: {eureka_conf}")
         
         # Configuration RabbitMQ
         RABBITMQ = {
@@ -110,7 +141,7 @@ def load_config():
         
         # Mettre à jour les variables d'environnement
         env_updates = {
-            'APP_PORT': str(eureka_conf['port']),
+            'APP_PORT': properties.get('server.port'),
             'MYSQL_HOST': MYSQL['host'],
             'MYSQL_PORT': MYSQL['port'],
             'MYSQL_DB': MYSQL['database'],
@@ -120,7 +151,7 @@ def load_config():
             'RABBITMQ_PORT': RABBITMQ['port'],
             'RABBITMQ_USER': RABBITMQ['username'],
             'RABBITMQ_PASSWORD': RABBITMQ['password'],
-            'EUREKA_SERVER': eureka_conf['server']
+            'EUREKA_SERVER': properties.get('eureka.client.service-url.defaultZone')
         }
         
         # Mettre à jour les variables d'environnement en mémoire
@@ -130,63 +161,16 @@ def load_config():
         update_env_file(env_updates)
         
         # Initialiser le client Eureka
-        init_eureka(eureka_conf)
+        init_eureka()
         
-        return CONF, eureka_conf, RABBITMQ, MYSQL
+        logger.info(f"Chargement de la configuration réussi")
+
     
     except Exception as e:
         logger.error(f"Erreur lors de la récupération de la configuration: {e}")
-        return None, None, None, None
+        logger.info("Utilisation des configurations par défaut")
 
-# Charger la configuration
-CONF, eureka_conf, RABBITMQ, MYSQL = load_config()
 
-# Si la configuration n'a pas pu être chargée, utiliser les valeurs par défaut
-if CONF is None:
-    logger.info("Utilisation des valeurs par défaut...")
-    
-    # Valeurs par défaut si le serveur de configuration n'est pas disponible
-    eureka_conf = {
-        'server': 'http://localhost:8761/eureka/',
-        'app_name': os.getenv('APP_NAME', 'service-vm-offer').upper(),
-        'port': int(os.getenv('APP_PORT', 5002))
-    }
-    
-    RABBITMQ = {
-        'host': 'localhost',
-        'port': '5672',
-        'username': 'guest',
-        'password': 'guest'
-    }
-    
-    MYSQL = {
-        'host': os.getenv('MYSQL_HOST', 'localhost'),
-        'port': os.getenv('MYSQL_PORT', '3306'),
-        'database': os.getenv('MYSQL_DB', 'service_vm_offer_db'),
-        'username': os.getenv('MYSQL_USER', 'root'),
-        'password': os.getenv('MYSQL_PASSWORD', 'root')
-    }
-    
-    # Mettre à jour les variables d'environnement avec les valeurs par défaut
-    env_updates = {
-        'APP_PORT': str(eureka_conf['port']),
-        'MYSQL_HOST': MYSQL['host'],
-        'MYSQL_PORT': MYSQL['port'],
-        'MYSQL_DB': MYSQL['database'],
-        'MYSQL_USER': MYSQL['username'],
-        'MYSQL_PASSWORD': MYSQL['password'],
-        'RABBITMQ_HOST': RABBITMQ['host'],
-        'RABBITMQ_PORT': RABBITMQ['port'],
-        'RABBITMQ_USER': RABBITMQ['username'],
-        'RABBITMQ_PASSWORD': RABBITMQ['password'],
-        'EUREKA_SERVER': eureka_conf['server']
-    }
-    
-    # Mettre à jour les variables d'environnement en mémoire
-    update_env_vars(env_updates)
-    
-    # Mettre à jour le fichier .env
-    update_env_file(env_updates)
 
 
 
