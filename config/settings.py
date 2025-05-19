@@ -8,7 +8,6 @@ import dotenv
 import sys
 import logging
 from pathlib import Path
-from .eureka_client import init_eureka
 import requests 
 
 
@@ -79,12 +78,7 @@ def update_env_vars(env_vars):
         os.environ[key] = str(value)
     logger.info("Variables d'environnement mises à jour en mémoire")
 
-# Configuration du serveur de configuration
-CONFIG_SERVER = {
-    'config': {
-        'uri': os.getenv('SERVICE_CONFIG_URI'),
-    }
-}
+
 
 def load_config():
     try:
@@ -159,9 +153,6 @@ def load_config():
         
         # Mettre à jour le fichier .env
         update_env_file(env_updates)
-        
-        # Initialiser le client Eureka
-        init_eureka()
         
         logger.info(f"Chargement de la configuration réussi")
 

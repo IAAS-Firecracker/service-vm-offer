@@ -1,0 +1,1 @@
+from .model_vm_offer import VMOfferEntity
