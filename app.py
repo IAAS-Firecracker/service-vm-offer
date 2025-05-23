@@ -81,9 +81,9 @@ if __name__ == '__main__':
     # Initialiser la base de données
     if init_database():
         
-        # create_tables()
-        # # Ajouter des données de test
-        # seed_test_data()
+        create_tables()
+        # Ajouter des données de test
+        seed_test_data()
         
         # Démarrer l'application FastAPI avec uvicorn
         import uvicorn

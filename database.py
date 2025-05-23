@@ -1,10 +1,11 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import logging
 import pymysql
-from models.model_vm_offer import VMOfferEntity
+from models import *
+from sqlalchemy.ext.declarative import declarative_base
 
 
 # Charger les variables d'environnement
@@ -20,33 +21,10 @@ DATABASE_URL = f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PAS
 # Créer le moteur SQLAlchemy
 engine = create_engine(DATABASE_URL, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def create_database():
-    """Crée la base de données si elle n'existe pas"""
-    from sqlalchemy import text
-    try:
-        # D'abord, créer une connexion sans spécifier la base de données
-        temp_engine = create_engine(
-            f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT')}/",
-            echo=True
-        )
-        
-        # Créer la base de données
-        with temp_engine.connect() as conn:
-            cursor.execute(f"DROP DATABASE IF EXISTS {os.getenv('MYSQL_DB', 'service_vm_offer_db')}")
-            conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {os.getenv('MYSQL_DB', 'service_vm_offer_db')}") )
-            conn.commit()
-        
-        logger.info(f"Base de données {os.getenv('MYSQL_DB', 'service_vm_offer_db')} créée avec succès")
-    except Exception as e:
-        logger.error(f"Erreur lors de la création de la base de données: {str(e)}")
-        raise
-
+Base = declarative_base()
 
 def create_tables():
     """Crée les tables dans la base de données"""
-    from models.model_vm_offer import Base
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Tables créées avec succès")
@@ -59,10 +37,34 @@ def init_database():
     """Initialise la base de données en créant la base et les tables"""
     try:
         logger.info("Initialisation de la base de données...")
-        create_database()
-        create_tables()
-        seed_test_data()
-        logger.info("Initialisation terminée avec succès")
+        # Récupérer les informations de connexion depuis les variables d'environnement
+        mysql_host = os.getenv('MYSQL_HOST')
+        mysql_port = int(os.getenv('MYSQL_PORT'))
+        mysql_user = os.getenv('MYSQL_USER')
+        mysql_password = os.getenv('MYSQL_PASSWORD')
+        mysql_database = os.getenv('MYSQL_DB', 'service_vm_offer_db')
+        
+        logger.info(f"Connexion à MySQL: {mysql_host}:{mysql_port} avec l'utilisateur {mysql_user}")
+        
+        # Créer la base de données si elle n'existe pas
+        conn = pymysql.connect(
+            host=mysql_host,
+            port=mysql_port,
+            user=mysql_user,
+            password=mysql_password
+        )
+        
+        cursor = conn.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS {mysql_database}")
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {mysql_database}")
+        conn.commit()
+        
+        logger.info(f"Base de données '{mysql_database}' créée ou déjà existante.")
+        
+        cursor.close()
+        conn.close()
+        
+        return True
     except Exception as e:
         logger.error(f"Erreur lors de l'initialisation de la base de données: {str(e)}")
         raise
@@ -77,11 +79,12 @@ def get_db():
         db.close()
 
 
-
-
 # Fonction pour ajouter des données de test
 def seed_test_data():
     """Ajoute des données de test dans la base de données"""
+    # Import ici pour éviter les importations circulaires
+    from models.model_vm_offer import VMOfferEntity
+    
     try:
         db = SessionLocal()
         try:

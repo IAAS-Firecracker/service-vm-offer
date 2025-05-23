@@ -3,8 +3,8 @@ from typing import Optional
 from sqlalchemy import Column, Integer, String, Text, DateTime, func
 from sqlalchemy.types import Numeric, Boolean
 from pydantic import BaseModel
-from .base import Base
 from datetime import datetime
+from database import Base
 
 class VMOfferEntity(Base):
     __tablename__ = 'vm_offers'
