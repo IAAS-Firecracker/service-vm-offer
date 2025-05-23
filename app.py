@@ -50,11 +50,23 @@ app.add_middleware(
 # Connect to RabbitMQ on startup
 @app.on_event("startup")
 async def startup_event():
-    #init with eureka
-    await register_with_eureka()
-    # Connect to RabbitMQ and set up the exchange
-    vm_offer_publisher.connect()
-    print(f"Connected to RabbitMQ exchange: {vm_offer_publisher.exchange_name}")
+    try:
+        # Initialize database
+        logger.info("Initializing database...")
+        if init_database():
+            create_tables()
+            seed_test_data()
+            logger.info("Database initialized successfully")
+        
+        # Register with Eureka
+        await register_with_eureka()
+        
+        # Connect to RabbitMQ and set up the exchange
+        vm_offer_publisher.connect()
+        print(f"Connected to RabbitMQ exchange: {vm_offer_publisher.exchange_name}")
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}")
+        raise
 
 # Close RabbitMQ connection on shutdown
 @app.on_event("shutdown")
