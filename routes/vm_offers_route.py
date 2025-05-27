@@ -90,21 +90,53 @@ async def create_vm_offer(vm_offer: VMOfferCreate, db: Session = Depends(get_db)
             data={}
         )
 
+@router.get("/active", response_model=StandardResponse)
+async def get_active_vm_offers(db: Session = Depends(get_db)):
+    """Obtient toutes les offres de VM actives"""
+    try:
+        vm_offers = db.query(VMOfferEntity).filter(VMOfferEntity.is_active == True).all()
+        if not vm_offers:
+            return StandardResponse(
+                statusCode=404,
+                message="Aucune offre de VM active trouvée",
+                data=[]
+            )
+        # Convertir chaque VMOfferEntity en dictionnaire
+        vm_offers_list = [offer.to_dict() for offer in vm_offers]
+        return StandardResponse(
+            statusCode=200,
+            message="Liste des offres de VM actives récupérée avec succès",
+            data={"offers": vm_offers_list}
+        )
+    except Exception as e:
+        return StandardResponse(
+            statusCode=500,
+            message=f"Erreur lors de la récupération des offres actives: {str(e)}",
+            data={}
+        )
+
 @router.get("/{id}", response_model=StandardResponse)
 async def get_vm_offer(id: int, db: Session = Depends(get_db)):
     """Obtient une offre de VM par son ID"""
-    vm_offer = db.query(VMOfferEntity).filter(VMOfferEntity.id == id).first()
-    if vm_offer is None:
+    try:
+        vm_offer = db.query(VMOfferEntity).filter(VMOfferEntity.id == id).first()
+        if vm_offer is None:
+            return StandardResponse(
+                statusCode=404,
+                message=f"Offre de VM avec l'ID {id} non trouvée",
+                data={}
+            )
         return StandardResponse(
-            statusCode=404,
-            message="Offre de VM non trouvée",
+            statusCode=200,
+            message=f"Offre de VM {id} récupérée avec succès",
+            data=vm_offer.to_dict()
+        )
+    except Exception as e:
+        return StandardResponse(
+            statusCode=500,
+            message=f"Erreur lors de la récupération de l'offre {id}: {str(e)}",
             data={}
         )
-    return StandardResponse(
-        statusCode=200,
-        message="Offre de VM récupérée avec succès",
-        data={"vm_offer": vm_offer.to_dict()}
-    )
 
 @router.put("/{id}", response_model=StandardResponse)
 async def update_vm_offer(id: int, vm_offer: VMOfferUpdate, db: Session = Depends(get_db)):
@@ -198,27 +230,7 @@ async def delete_vm_offer(id: int, db: Session = Depends(get_db)):
             data={}
         )
 
-@router.get("/active", response_model=StandardResponse)
-async def get_active_vm_offers(db: Session = Depends(get_db)):
-    """Obtient toutes les offres de VM actives"""
-    try:
-        vm_offers = db.query(VMOfferEntity).filter(VMOfferEntity.is_active == True).all()
-        if vm_offers is None:
-            return StandardResponse(
-                statusCode=404,
-                message="Aucune offre de VM active trouvée",
-                data={}
-            )
-        vm_offer_list = [vm_offer.to_dict() for vm_offer in vm_offers]
-        return StandardResponse(
-            statusCode=200,
-            message="Liste des offres de VM actives récupérée avec succès",
-            data=vm_offer_list
-        )
-    except Exception as e:
-        return StandardResponse(
-            statusCode=500,
-            message=str(e),
-            data={}
-        )
+
+# Route pour obtenir toutes les offres actives
+
     
