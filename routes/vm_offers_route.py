@@ -6,6 +6,7 @@ from models.model_vm_offer import VMOfferEntity, VMOfferCreate, VMOfferUpdate
 from RabbitMQ.publisher.vm_offer_publisher import vm_offer_publisher
 # Importer les dépendances depuis le fichier dependencies.py
 from dependencies import get_db, StandardResponse
+from datetime import datetime
 
 router = APIRouter(
     prefix="/api/vm-offers",
